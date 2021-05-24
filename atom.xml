@@ -1,0 +1,1222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+    <id>blog.hacking.icu</id>
+    <title>苏近之的博客</title>
+    <updated>2021-05-24T05:53:36.252Z</updated>
+    <generator>https://github.com/jpmonette/feed</generator>
+    <link rel="alternate" href="blog.hacking.icu"/>
+    <link rel="self" href="blog.hacking.icu/atom.xml"/>
+    <subtitle>在图像里寻找自我，在代码里发现自由。</subtitle>
+    <logo>https://static.gridea.dev/294376244890305033/JP_dJm_rx.ico</logo>
+    <icon>https://static.gridea.dev/294376244890305033/JP_dJm_rx.ico</icon>
+    <rights>All rights reserved 2021, 苏近之的博客</rights>
+    <entry>
+        <title type="html"><![CDATA[MongoDB CRUD]]></title>
+        <id>https://blog.hacking.icu/mongodb-crud</id>
+        <link href="https://blog.hacking.icu/mongodb-crud"/>
+        <updated>2021-05-24T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[这一篇文档描述了在 Mongo 中的 CRUD 操作。透过最常用的增删改查来快速了解 MongoDB 。
+插入操作
+插入文档的语法如下:
+db.&lt;collection&gt;.[insertOne|insertMany]({
+  ke...]]></summary>
+        <content type="html"><![CDATA[<p>这一篇文档描述了在 Mongo 中的 CRUD 操作。透过最常用的增删改查来快速了解 MongoDB 。<br /></p>
+<h3 id="插入操作">插入操作</h3>
+<p><br />插入文档的语法如下:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.[insertOne|insertMany]({
+  key: value
+}, {}..., {writeConcern: &lt;document&gt;, ordered: &lt;boolean&gt;});
+</code></pre>
+<p>其中，<code>writeConcern</code>表示安全写，如果没有指定，则是默认写。  而<code>ordered</code>字段则表示无序写入，则 Mongo 会优化写入的速度。<br />​</p>
+<p>指定插入命令之后，返回的响应如下:</p>
+<pre><code class="language-javascript">{&quot;ackownledged&quot;: true, &quot;insertedId&quot;: &quot;xxx&quot;}
+</code></pre>
+<p>如果我们没有通过<code>_id</code>指定主键，那么会自动生成唯一的主键序列。如果制定了重复的主键，则会返回错误：</p>
+<pre><code>E11000 duplicate key error collection: test.accounts.index: _id_ dup key...
+</code></pre>
+<p>我们可以使用<code>ObjectId()</code>函数来创建对象主键，对象主键中也包含了文档的创建时间，我们可以通过<code>ObjectId('5db42e...').getTimestamp()</code> 来获取文档的创建时间。此外，我们可以创建一个复合主键，指定一个文档作为主键:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.insert({_id: {type: &quot;saveings&quot;, accountNo: &quot;001&quot;}})
+</code></pre>
+<p>另外，创建文档也可以使用 <code>insert</code>命令，这个命令和前两个命令的区别是它会根据你你可以传入单个或者多个文档，另外这个命令支持<code>explain</code>查看执行计划，而<code>insertOne</code>和<code>insertMany</code>不支持。另外，还可以使用<code>save</code>命令，但是这个命令底层也是调用<code>insert</code>命令的，所以返回一致。</p>
+<h3 id="查询文档">查询文档</h3>
+<p><br />查询文档我们使用<code>find</code>命令，它的语法如下:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find(&lt;query&gt;, &lt;projection&gt;)
+</code></pre>
+<p>其中, <code>query</code> 指的是查询的条件，而<code>projection</code>则定义了对读取结果的投射（你可以理解为过滤查询字段)。<br /><br>
+<br />查询全部文档:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find() // 可以使用 find().pretty() 来美化输出结果
+</code></pre>
+<p>查询指定数量的文档：</p>
+<pre><code class="language-sql">db.&lt;collection&gt;.find().batchSize(20)
+</code></pre>
+<p>指定条件查询:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find({key1: value1, key2: value2})				// 默认为 and
+// 查询复合主键
+db.&lt;collection&gt;.find({&quot;_id.key&quot;: &quot;value&quot;})
+// 使用比较操作符, $eq \ $ne \ $gt \ $gte \ $lt \ $lte
+db.&lt;collection&gt;.find({key: {$eq: value}})	
+// 另外，还有两个常用的比较操作符：分别是 $in 和 $nin, 查询包含或者不包含指定值的情况
+db.&lt;collection&gt;.find({key: {$in: [&lt;value1&gt;, &lt;value2&gt;...&lt;valueN&gt;]}})
+</code></pre>
+<blockquote>
+<p>⚠️ ： 在使用 $ne 或者 $nin 操作符的时候，, 那么即使文档中不包含你指定的字段，也会查询出来。</p>
+</blockquote>
+<p>操作符号还包括逻辑操作符, 如下表所示:</p>
+<table>
+<thead>
+<tr>
+<th>操作符</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$not</td>
+<td>匹配(一个)筛选条件不成立的文档</td>
+</tr>
+<tr>
+<td>$and</td>
+<td>匹配多个筛选条件全部成立的文档</td>
+</tr>
+<tr>
+<td>$or</td>
+<td>匹配至少一个筛选条件成立的文档</td>
+</tr>
+<tr>
+<td>$nor</td>
+<td>匹配多个筛选条件全部不成立的文档</td>
+</tr>
+</tbody>
+</table>
+<p>示例如下:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find({ $and: [ {key: { $gt: value} }, {key, {$lt: &quot;value&quot;}} ] })
+</code></pre>
+<p>查询指定字段是否存在:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find( {key: { $exists: true }} ) // 查询存在 key 字段的文档
+</code></pre>
+<p>查询字段的类型:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find( {key: {$type: &quot;string&quot;}}). // 查询 key 的类型为 string 的文档
+</code></pre>
+<p>查询数组操作符，分为为 <code>$all</code>和<code>$elemMatch</code>:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find( { key: {$all: [&lt;value1&gt;, &lt;value2&gt; ...&lt;valueN&gt;]}}) // 包含所有指定的数组值
+db.&lt;collection&gt;.find( { key: {$elemMatch: [&lt;value1&gt;, &lt;value2&gt; ...&lt;valueN&gt;]}}) // 包含任意的数组值
+</code></pre>
+<p>使用正则表达式来查询:</p>
+<pre><code class="language-javascript">db.&lt;colletion&gt;.find({name: {$in: [ /^c/, /^j/]}}) // 查询 c 或者 j 开头的姓名
+db.&lt;collection&gt;.find({name: {$regex: /LIE/, $options: 'i' }}) // i 表示不区分大小写，大部分使用这样的语法，除非用 in
+</code></pre>
+<p>默认返回前面 20 条数据，查询数量:</p>
+<pre><code class="language-sql">db.&lt;collection&gt;.find().count()
+</code></pre>
+<p>查询单条数据:</p>
+<pre><code class="language-sql">db.&lt;collection&gt;.findOne()
+</code></pre>
+<p>有些字段是对象，可以采用嵌套查询:</p>
+<pre><code class="language-sql">db.&lt;collection&gt;.find({
+    &quot;imdb.rating&quot;: 6.2
+})
+</code></pre>
+<p>查询评分少于 6.2 的电影:</p>
+<pre><code class="language-sql">db.&lt;collection&gt;movies.find({
+    &quot;imdb.rating&quot;: {$lt: 6.2}
+})
+</code></pre>
+<p>再来看看如何进行排序:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find().sort({key1: -1, key2: 1})
+</code></pre>
+<blockquote>
+<p>注意⚠️: 当 <code>skip</code>、<code>limit</code>、<code>sort</code> 命令一起执行的时候，需要注意顺序，<code>sort</code> 会在 <code>limit</code> 和 <code>skip</code>之前执行，<code>skip</code>在 <code>limit</code> 之前执行。</p>
+</blockquote>
+<p>最后再来看看文档的投影:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find({}, { key: 1 }) // 值返回文档中的 key, 和文档主键
+db.&lt;collection&gt;.find({}, { key: 0 }) // 不返回文档中的 key
+</code></pre>
+<blockquote>
+<p>注意⚠️：除了文档主键其他的不能混用包含和不包含两种操作，要么使用包含，要么使用不包含。</p>
+</blockquote>
+<p>在涉及到数组的时候，投影可能会更加的复杂。看如下示例：</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.find({}, {key: { $slide: 1}}). // key 是一个数组，使用 $slide 只返回它的第一个元素，也可以使用 -1 -2
+db.&lt;collection&gt;.find({}, {key: { $elemMatch: {$gt: &quot;value&quot;}}}) // 返回数组只能够第一个满足大于指定的值的元素
+</code></pre>
+<br />
+<h3 id="更新文档">更新文档</h3>
+<p><br />更新文档使用<code>update</code>命令，具体的语法如下:</p>
+<pre><code class="language-javascript">db.&lt;collection&gt;.[updateOne|updateMany](&lt;query&gt;, &lt;update&gt;, &lt;options&gt;)
+</code></pre>
+<p>其中，<code>query</code>定义了查询的条件，即满足条件的文档会被更新；<code>update</code>表示文档更新的内容；<code>options</code>是更新的一些选项配置。例如下面的示例更新了用户的名称:</p>
+<pre><code class="language-javascript">db.tags.updateOne({name: &quot;Tom&quot;}, {
+    $set: {name: &quot;Bob&quot;},
+})
+</code></pre>
+<blockquote>
+<p>注意：文档的主键 <code>_id</code> 是不能够被更改的。</p>
+</blockquote>
+<p>默认情况下，只会更新一篇文档，即使是查询到条件满足多篇文档也是如此。除非我们在 <code>options</code> 文档中指定 <code>multi</code> 参数为 <code>true</code> ，才会更新多篇文档。</p>
+<blockquote>
+<p>注意:  MongoDB 只能保障单个文档更新的原子性，而不能保证多个文档更新时候的原子性。更新多个文档的操作苏联在单一线程中执行，但是线程在执行过程中可能会被挂起，以便其他线程也有机会对数据进行操作，在这个过程中挂起线程中的文档就可能会其他线程改变。如果需要保障多个文档的更新的原子性，就需要使用 4.0 版本开始提供的事务特性。</p>
+</blockquote>
+<p>默认情况下，如果更新中指定的查询条件不被任何文档满足，就不会更新任一文档。但是我们可以通过<code>options</code>文档中的<code>upsert</code> 字段来改变这样的默认行为，即使不满足任何条件，也会创建文档。<br />​</p>
+<p>如果我们使用 <code>db.&lt;collection&gt;.save(&lt;document&gt;)</code> 命令的时候，如果当中包含了 <code>_id</code> 字段，就会调用<code>db.&lt;collection&gt;.update</code> 来更新我们的文档，否则则会创建文档。<br />​<br /></p>
+<h4 id="基本操作符">基本操作符</h4>
+<p><br />上文中，类似于<code>$set</code>这样的被称之更新操作符。类似的如下所示:</p>
+<table>
+<thead>
+<tr>
+<th>操作符</th>
+<th>描述</th>
+<th>操作符</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$set</code></td>
+<td>更新或者新增字段</td>
+<td><code>$unset</code></td>
+<td>删除字段</td>
+</tr>
+<tr>
+<td><code>$rename</code></td>
+<td>重命名字段</td>
+<td><code>$inc</code></td>
+<td>加减字段</td>
+</tr>
+<tr>
+<td><code>$mul</code></td>
+<td>相乘字段值</td>
+<td><code>$min</code></td>
+<td>比较减小字段值</td>
+</tr>
+<tr>
+<td><code>$max</code></td>
+<td>比较增大字段值</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>我们在来看看<code>$unset</code> 操作符的示例:</p>
+<pre><code class="language-javascript">db.tags.updateOne({name: &quot;Bob&quot;}, {
+    $unset: {
+        status: &quot;这里写什么都可以，不影响删除这个字段&quot;,
+    }
+})
+</code></pre>
+<blockquote>
+<p>注意: 如果 <code>$unset</code> 的字段在文档中不存在，则不会执行更新操作。另外，需要注意，如果 <code>$unset</code> 的是一个数组元素，那么数组的元素会被设置为 <code>null</code>, 但是数组的长度不会被改变。</p>
+</blockquote>
+<p><br />接着我们再来看看<code>$rename</code> 操作符的示例:</p>
+<pre><code class="language-javascript">db.tags.updateMany({name: &quot;Bob&quot;}, {
+    $rename: {
+        name: &quot;nickname&quot;
+    }
+})
+</code></pre>
+<p>语法都几乎是一样的，但是有一点需要注意，如果并不是更新整个集合的所有文档，那么并不会删除这个被 rename 的字段，而是会将其值置为 <code>null</code>, 并添加新字段。如果所有的文档的字段都被统一 <code>rename</code>，则原字段会被删除。如果<code>$rename</code>的字段不存在，则不会更新文档。如果字段已经存在，则已经存在的字段下的值会被 <code>$rename</code> 的值覆盖。<br />​</p>
+<p>另外，<code>$rename</code> 操作也可以用来改变文档的结构，比如插入如下文档:</p>
+<pre><code class="language-javascript">db.products.insertOne({
+    name: &quot;iPhone 12 Pro Max&quot;,
+    price: 9200.00,
+    details : {
+        main_img: &quot;http://dv-test.cn/img/202005240102.jpg&quot;,
+        sku: {memory: &quot;6GB&quot;, storage: &quot;128GB&quot;}
+    }
+})
+</code></pre>
+<p>如果我希望把 <code>.details.main_img</code> 提升到 <code>.main_img</code> ，把 <code>.price</code> 放到 <code>.detail</code> 当中去呢？如下实例:</p>
+<pre><code class="language-javascript">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $rename: {
+        price: &quot;details.price&quot;,
+        &quot;details.main_img&quot;: &quot;main_img&quot;
+    }
+})
+</code></pre>
+<blockquote>
+<p>注意: <code>$rename</code> 来改变文档字段结构的时候，更新前和更新后的字段都不能是数组内的元素。</p>
+</blockquote>
+<p>和其他数据库的更新操作不一样，Mongo 还增加了 <code>$min</code> 和 <code>$max</code> 这两个比较更新操作符。顾名思义，先行比较，比较之后根据比较结果的大小来决定是否更新。我们以<code>$min</code>来举例:</p>
+<pre><code class="language-json">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $min: {
+        &quot;details.price&quot;: 10000.00,
+    }
+})
+</code></pre>
+<p>这条更新操作并不会真得更新。因为我们得产品的价格是 9200, 小于我们更新的价格，因为 <code>$min</code> 操作符的缘故，所以不会更新大于原始值的值。如果换成<code>$max</code> 操作符，就会更新。**类似于<code>$inc</code>、<code>$min</code>、<code>$max</code> 这样的操作符，如果更新的字段并不存在，则仍旧会更新。另外，如果更新后的字段类型和原来的字段类型不同，会根据 Mongo 默认的比较规则来更新。规则如下:</p>
+<table>
+<thead>
+<tr>
+<th>最小</th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th>最大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Null</td>
+<td>Numbers</td>
+<td>Symbol、String</td>
+<td>Object</td>
+<td>Array</td>
+<td>BinData</td>
+<td>ObjectId</td>
+<td>Boolean</td>
+<td>Date</td>
+<td>Timestamp</td>
+<td>Regular Expression</td>
+</tr>
+</tbody>
+</table>
+<br />
+<h4 id="数组操作符">数组操作符</h4>
+<p><br />我们来说一些更新数组的操作符:</p>
+<table>
+<thead>
+<tr>
+<th>操作符</th>
+<th>描述</th>
+<th>操作符</th>
+<th>描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$addToSet</code>​</td>
+<td>向数组中添加元素</td>
+<td><code>$pop</code></td>
+<td>从数组中移除元素</td>
+</tr>
+<tr>
+<td><code>$pull</code>​</td>
+<td>从数组中有选择性移除元素</td>
+<td><code>$pullAll</code>​</td>
+<td>从数组中有选择性地移除元素</td>
+</tr>
+<tr>
+<td><code>pull</code>​</td>
+<td>向数组中添加元素</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>首先，我们来演示 <code>$addToSet</code> ，如果指定的 key 不存在则会创建。下面的示例中，我们为 <code>products</code>集合中的 <code>iPhone 12 Pro Max</code>添加类目信息，它是一个数组:</p>
+<pre><code class="language-javascript">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $addToSet: {
+        categories: [&quot;Phone&quot;, &quot;Apple&quot;]
+    }
+})
+</code></pre>
+<p>这里需要注意的是，如果你添加的字段的值的顺序不同，也会被作为新的内容插入，比如说你把<code>categories</code>的值改成<code>[&quot;Apple&quot;, &quot;Phone&quot;]</code> 也会被当作新的记录插入。<br />​</p>
+<p>那么如果我希望往数组中添加一个值呢？将<code>[&quot;Phone&quot;,  &quot;Apple&quot;]</code>改成<code>[&quot;Phone&quot;, &quot;Apple&quot;, &quot;2021&quot;, &quot;Hot&quot;]</code>呢？可以使用<code>$push</code>操作符:</p>
+<pre><code class="language-javascript">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $push: {
+        &quot;categories.0&quot;: {
+          $each: [&quot;2021&quot;, &quot;Hot&quot;],
+          $position: 0, $sort: 1, $slice: -8
+        }
+    }
+})
+</code></pre>
+<p>如果你不加上<code>$each</code>操作符的话，<code>[&quot;2021&quot;, &quot;Hot&quot;]</code> 整个数组都会被作为一个元素插入到原有的数组中去。而 <code>$position</code> 操作符的作用是将元素添加到指定位置，接受负值。而 <code>$sort</code> 操作符是为了给更新后的数组排序的（1 升序、-1 降序），<code>$slice</code> 操作符可以对更新后数组进行截取。<strong>但</strong><code>**$slice**</code>** 和  <strong><code>**$sort**</code></strong> 操作符必须和 <strong><code>**$each**</code></strong> 和 <strong><code>**$push**</code></strong> 配合使用。<strong>不管书写的顺序是什么，但是</strong>这几个操作符的执行允许永远是先**<code>**$position**</code>** 后 <strong><code>**$sort**</code></strong> 最后 <strong><code>**$slice**</code></strong>。**<br />​</p>
+<p>既然有<code>$push</code>就会有对应的<code>$pop</code>， 删除一个元素，示例如下:</p>
+<pre><code class="language-javascript">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $pop: {
+        &quot;categories.1&quot;: -1,
+    }
+})
+</code></pre>
+<p>使用<code>$pop</code>操作符清除数组中最后一个元素之后，并不会清除数组本身，而是保留空数组。另外，不要将<code>$pop</code>运用在非数组类型的字段上。和 <code>$pop</code> 相比，我们可以使用更加灵活的<code>$pull</code> 操作符:</p>
+<pre><code class="language-json">db.products.updateOne({name: &quot;iPhone 12 Pro Max&quot;}, {
+    $pull: {
+        &quot;categories.0&quot;: { $regex: /20/ },
+    }
+})
+</code></pre>
+<p>上面的代码中，我们使用了正则来查找出匹配的数组元素，并删除，所以相比 <code>$pop</code> 而言更加的灵活、强大。除了<code>$pull</code>操作符外，还有一个<code>$pullAll</code>操作符，可以指定多个匹配的值，然后删除全部匹配的内容。下面两个命令达到的效果是一样的:</p>
+<pre><code class="language-json">{ $pullAll: { key: [value1, value2]}}
+{ $pull: {key: {$in: [value1, value2]}}}
+</code></pre>
+<p><strong>但是需要注意的是，使用</strong><code>**$pullAll**</code><strong>操作符，必须完全匹配文档的内容，遇到数组、对象这样的类型的时候必须完全匹配。而使用</strong><code>**$pull**</code><strong>操作符则不必完全匹配。</strong></p>
+<h5 id=""></h5>
+<h4 id="占位符">占位符</h4>
+<p><br />我们来看下面的语句来说明占位符的作用:</p>
+<pre><code class="language-json">db.products.updateOne({ name: &quot;iPhone 12 Pro Max&quot;, categories: [&quot;Phone&quot;]}, {
+    $set: {
+        &quot;categories.$&quot;: [&quot;Spring&quot;]
+    }
+})
+</code></pre>
+<p>这句当中的 <code>$</code> 符号就是占位符，表示的是更新数组的第一个符合条件 元素。看上面的示例，<code>categories.$</code> 指代的就是在符合我们的查询条件 <code>categories: [&quot;Phone&quot;]</code> 的第一个值，它将被更新为 <code>[&quot;Spring&quot;]</code>。<br />​</p>
+<p>使用 <code>$</code> 占位符更新的只是符合条件的第一个值，那么如果我希望更新所有符合条件的值呢？可以使用占位符 <code>$[]</code>， 这样就不需要指定条件了，如下:</p>
+<pre><code class="language-json">db.products.updateOne({ name: &quot;iPhone 12 Pro Max&quot;}, {
+    $set: {
+        &quot;categories.$[]&quot;: [&quot;Spring!&quot;]
+    }
+}) 
+</code></pre>
+<br />
+<h3 id="删除文档">删除文档</h3>
+<p><br />删除文档相比之前的操作来说简单多了，可以使用 <code>deleteOne|deleteMany</code>命令，语法格式如下:</p>
+<pre><code class="language-json">db.&lt;collection&gt;.[deleteOne|deleteMany](&lt;query&gt;, &lt;options&gt;)
+</code></pre>
+<p>其中<code>query</code> 文档用以指定查询条件，而<code>options</code> 用以指定删除的一些配置选项。例如我们要删除之前产品的文档:</p>
+<pre><code class="language-json">db.products.deleteOne({ name: &quot;iPhone 12 Pro Max&quot;})
+</code></pre>
+<p>删除所有文档，可以不指定参数:</p>
+<pre><code class="language-json">db.products.deleteMany({})
+</code></pre>
+<p>如果我们需要删除整个集合，可以使用 <code>drop</code> 命令:</p>
+<pre><code class="language-json">db.products.drop()
+</code></pre>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Unix 进程]]></title>
+        <id>https://blog.hacking.icu/process-in-unix</id>
+        <link href="https://blog.hacking.icu/process-in-unix"/>
+        <updated>2021-05-18T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[这一篇来讲解面试中经常会问起的进程，它们是什么？以及它们之间是如何通信的。
+什么是进程
+什么是进程？很多人和我一样，好像似懂非懂。因为从事高级编程，所以对于这些概念而言，也仅仅是概念。比如对于 PHPer 来说，每一个 PHP 脚本就是一个...]]></summary>
+        <content type="html"><![CDATA[<p>这一篇来讲解面试中经常会问起的进程，它们是什么？以及它们之间是如何通信的。</p>
+<h3 id="什么是进程">什么是进程</h3>
+<p>什么是进程？很多人和我一样，好像似懂非懂。因为从事高级编程，所以对于这些概念而言，也仅仅是概念。比如对于 PHPer 来说，每一个 PHP 脚本就是一个进程。PHP 还有一个名为 PHP-FPM 的进程管理器，用来为每一个请求分配一个进程去处理。</p>
+<p>这里我推荐一本书，名为 《理解 Unix 进程》。这是一本很小的册子，花三两个小时就可以看完它，看完它你会对进程有更多的理解。如果你的时间并不是那么充裕，那么也可以看本文接下来的内容，会对这本书中的核心内容做一些摘录，相信也可以让你了解进程。</p>
+<h3 id="进程和程序之间的关系">进程和程序之间的关系</h3>
+<p>程序是什么？程序是代码，而代码是存储在磁盘中的文本文件中的内容。这些文件并不会自动运行，因为它们和其他的文本文件没有什么区别。</p>
+<p>CPU 要执行程序的时候，必须要把代码加载到内存中，然后进一步将内存中的数据加载到高速缓存中，最后从缓存中读取指令并运行。</p>
+<p>这就是计算机系统中的多级存储机制，为什么不直接从硬盘中读取速度呢？因为 CPU 的运行速度远远大于硬盘，等不起啊。</p>
+<p>另外，所有的程序都是指令和数据的集合。除了程序本身外，还需要有数据。因为程序只会做三件事情: 输入、运算、输出。所以，需要输入数据、对数据进行运算、在将运算后的结果数据输出到文件或者终端中。而在运行期间的数据，也就是我们程序中的变量，有同样是存储与我们的内存之中的。</p>
+<p>所以，我们把内存中的程序叫做进程，把进程也称之为程序的实例。为什么说是实例呢？因为一个程序可以开启多次，每一次都在不同的进程中，虽然使用同样的代码，但它们的数据并不通用。</p>
+<p>所以，在 《理解 Unix 进程》一书中将进程称之为 Unix 之本，因为所有的代码都是运行在内存中的进程中的。</p>
+<pre><code>$ ruby -e &quot;p Time.now&quot;
+</code></pre>
+<blockquote>
+<p>《理解 Unix 进程》这本书中的所有示例都是使用 Ruby 语言编写的，运行实例首先需要安装 Ruby 的解释器。在 Ubuntu 下可以使用 <code>sudo apt install ruby -y</code> , 而在 CentOS 下，可以使用 <code>sudo dnf install ruby -y</code> 安装。</p>
+</blockquote>
+<p>上面的代码在实行的时候，就是一个内存中的进程。执行结束之后，这个进程就被操作系统销毁了，在内存中也就不复存在了。在操作系统中运行的每一条命令、每一个程序都是一个进程，比如使用 <code>cd</code> 切换目录，或者运行 MySQL 这样的大型软件系统都是如此。</p>
+<h3 id="进程皆有标识">进程皆有标识</h3>
+<p>在系统中运行的进程都有一个唯一的进程标识符，我们称之为 pid（process id）。就像我们数据库系统中的用户 ID 一样，本身并没有一个意义，只是一个自增长的序列编号而已。pid 也是在内核中用来标记进程的一个自增长的编号。</p>
+<pre><code>$ ruby -e &quot;puts Process.pid&quot;
+3155   # 输出一定是和我不一样的，但应该是递增的整数
+</code></pre>
+<p>上面的代码输出了程序自身在运行时候的 pid, 这是操作系统在创建该进程的时候分配的一个整形的数值。从1 开始递增。所以，有一个 pid 为 1 的进程最为特殊，我们通常称之为初始化进程。在 CentOS7/8 中，这个进程为 <code>/usr/lib/systemd/systemd</code> 。</p>
+<p>Ruby 语言中的 Process.pid 实际上是对操作系统中的 getpid 这个系统调用的封装，我们可以通过 man 3 gitpid 来查看手册。另外，下文给出 C 语言获取 pid 的代码示例:</p>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+
+int main() {
+        int pid = getpid();
+        printf(&quot;Pid is %d.\n&quot;, pid);
+        return 0;
+}
+</code></pre>
+<p>在 Bash Shell 中，我们也可以通过 <code>$$</code> 符号来获取 pid，示例如下:</p>
+<pre><code class="language-bash">echo $$
+</code></pre>
+<p>在实际的环境中，有一些长期驻守在后台的进程，会将这个 pid 进程号写入一个文件，以便其他程序调用。我们也称呼这样的文件为 pid 文件。比如说 Nginx 、MySQL 都会如此。</p>
+<h3 id="进程皆有父">进程皆有父</h3>
+<p>在 Unix/Linux 系统中，我们可以通过系统调用 fork 来启动新的进程，A 进程启动 B 进程，那么 B 就是 A 进程的子进程。除了特殊的 pid 为 1 的进程外，都会有父进程。我们可以通过 pstree 命令来查看进程的父子关系。</p>
+<p>进程的 id 称之为 pid, 进程的父亲 id 称之为 ppid。我们使用 Ruby 来演示如何输出 ppid:</p>
+<pre><code>ruby -e &quot;puts Process.ppid&quot;
+</code></pre>
+<p>我们可以通过 ps 命令来查看父进程的相关信息:</p>
+<pre><code class="language-bash">$ ps -p $(ruby -e &quot;puts Process.ppid&quot;)
+    PID TTY          TIME CMD
+   2798 pts/0    00:00:00 bash
+</code></pre>
+<p>可以通过 <code>getppid(2)</code> 来查获取父进程id的系统调用。</p>
+<h3 id="进程皆有文件描述符">进程皆有文件描述符</h3>
+<p>在 Unix 中，每当进程打开一个文件，就会为这个文件赋予一个文件描述符，它是一个整形递增的数值。这样做的目的，是为了系统内核可以跟踪这些被打开的文件。</p>
+<p>但是有三个特殊的文件，被称为标准流，分别是标准输入(STDIN)、标准输出(STDOUT)以及标准错误(STDERR)。他们分别对应着 0、1、2 三个固定的文件描述符。</p>
+<p>每一个被创建的进程都会自动拥有（打开）这三个资源。为什么要这么做呢？拿 STDIN 举例，为了能够支持键盘，你需要指定一个键盘的驱动程序。如果你要在屏幕中输出 Hello World ，你需要知道并控制屏幕的像素。但是有了标准流之后，你就不需要这么做了。<strong>所以说，标准流的机制屏蔽了硬件设备的复杂性(是对众多硬件设备的封装或抽象)</strong>。</p>
+<p>下面，我们使用程序打开一个文件，看看文件描述符长什么样子？其实和 pid 以及 ppid 一样:</p>
+<pre><code class="language-rube">passwd = File.open('/etc/passwd')
+puts passwd.fileno
+passwd.close
+</code></pre>
+<p>我们创建一个名为 demo.rb 的文件，输入以上内容，然后使用 ruby demo.rb 运行它，会在终端输出一个整数值，这个数值就是所谓的文件描述符。对于运行中的进程而言，它就是文件的 ID。对于操作系统而言，会对每一个被进程打开的文件编号，编号的规则是大于 3 并且没有被使用的最小数值。</p>
+<p>如果你在 demo.rb 中追加一行代码并运行，就会报错，代码如下:</p>
+<pre><code>passwd.close
+puts passwd.fileno
+</code></pre>
+<p>错误输入如下:</p>
+<pre><code>Traceback (most recent call last):
+        1: from test.rb:4:in `&lt;main&gt;'
+test.rb:4:in `fileno': closed stream (IOError)
+</code></pre>
+<p>当我们的文件流被关闭( passwd.close )， 操作系统就会回收这个文件描述符，以供其他需要的进程使用。</p>
+<h3 id="进程皆有资源限制">进程皆有资源限制</h3>
+<p>之所以出现进程的概念，很大程度是也是为了对众多运行的程序进行统一的管理，避免单一的程序占用过多的资源，以至于其他的程序无法正常运作。所以说，进程也皆有资源限制。</p>
+<p>举例说，我们上文提到系统会为每个被进程打开的文件分配一个动态的文件描述符，但是这并不是无限制的。默认情况下，是 1024。我们可以通过 Linux 下 ulimit 命令来查看这个限制的数值:</p>
+<pre><code>$ ulimit -n
+1024
+</code></pre>
+<p>然后我们再来看下面这个程序片段:</p>
+<pre><code>$ ruby -e &quot;puts Process.getrlimit(:NOFILE)&quot;
+1024
+262144
+</code></pre>
+<p>这句代码输出了两个值，第一个 1024 只是的程序最多能够打开的文件数量的软限制，而第二个 262144 指的是程序最多能够打开的文件数量的硬限制。那么软限制和硬限制有什么区别呢？</p>
+<p>软限制程序自身也能够更改，而硬限制呢？除非是超级管理员或者具有超级管理员的权限才能够修改。</p>
+<pre><code>Process.setrlimit(:NOFILE, 4096)
+puts Process.getrlimit(:NOFILE)  // 输出 4096 4096
+</code></pre>
+<p>此外，还有其他的很多的限制，比如说限制文件创建的大小。</p>
+<h3 id="进程皆有环境和参数">进程皆有环境和参数</h3>
+<p>这里的环境指的是环境变量，即子进程会继承父进程中的环境，即环境中的变量。我们举例说明:</p>
+<pre><code>export MESSAGE='Hello World' &amp;&amp; ruby -e &quot;puts ENV['MESSAGE']&quot;  ## 输出 Hello World
+</code></pre>
+<p>相对于解析命令行参数，解析环境变量的代价会小一些。那么如果要获取命令行的参数如何做呢？</p>
+<pre><code>puts ARGV
+</code></pre>
+<p>我们可以将上面的文本内容保存在一个名为 test.py 的文件中，然后执行它:</p>
+<pre><code>$ ruby test.rb foo bar -va
+foo
+bar
+-va
+</code></pre>
+<p>这会将所有的命令中的参数全部输出到终端。</p>
+<h3 id="进程皆有名">进程皆有名</h3>
+<p>每一个进程都有名字，默认是程序的文件名。我们可以在运行中修改这个名字，铜鼓 $PROGRAM_NAME 这个变量:</p>
+<pre><code>puts $PROGRAM_NAME
+$PROGRAM_NAME = &quot;Process Demo&quot;
+puts $PROGRAM_NAME
+</code></pre>
+<p>通过在运行时修改进程的名字，还可以达到进程间通信的目的。</p>
+<h3 id="进程皆有退出码">进程皆有退出码</h3>
+<p>当进程结束的时候，可以使用一个退出码来告诉接下来要运行的程序自己的运行状态。这个退出码需要在 0-255 之间。我们以 Shell 中的内建命令 cd 为例:</p>
+<pre><code>$ cd not_exists_dir
+-bash: cd: not_exists_dir: No such file or directory
+$ echo $?
+</code></pre>
+<p>如果是进入一个不存在的文件夹，该程序就会返回 一个 1 的退出码。如果目录存在，则返回为 0。</p>
+<p>在 Ruby 中，我们可以通过 exit 来指定退出码:</p>
+<pre><code>exit 2
+</code></pre>
+<p>参考资料</p>
+<p>《理解 Unix 进程》<br>
+《Linux 就是这个范儿》<br>
+维基百科-进程ID<br>
+维基百科-标准流</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[全台大停电]]></title>
+        <id>https://blog.hacking.icu/power-cut-in-taiwan</id>
+        <link href="https://blog.hacking.icu/power-cut-in-taiwan"/>
+        <updated>2021-05-15T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[昨天台湾相隔三四年，再一次大面积断电。黑暗带来的是民众的恐慌，毕竟夏天要来了，天气会进一步炎热起来。可是，夏天也毕竟还没有来，此时就已经发生这样的事情，怎让人能对电力的供应提起信心。
+停电的原因是什么？在政治割裂的台湾，在野党和执政党对此的...]]></summary>
+        <content type="html"><![CDATA[<p>昨天台湾相隔三四年，再一次大面积断电。黑暗带来的是民众的恐慌，毕竟夏天要来了，天气会进一步炎热起来。可是，夏天也毕竟还没有来，此时就已经发生这样的事情，怎让人能对电力的供应提起信心。</p>
+<p>停电的原因是什么？在政治割裂的台湾，在野党和执政党对此的判断自然是截然不同。国民党捡到了枪，不断地攻击民进党的电力政策。民进党认真防守，对于一切缺电的指责都予以最坚决的否认，说这只是一起电力事故，电厂的维修人员按错了一个按钮。真相究竟为何好像不是那么重要，重要的是对于执政党来说如何面对这个夏天，如何让大众相信自己的电力政策，如何让台湾摆脱三缺，缺电，缺水，缺人。</p>
+<p>其实，对于台湾人来说，应该有种希望这只是缺电而不是事故。如果这是因为缺电，导致全台各区轮番限电，其实还好。一来也能理解，理解对于核事故的恐惧因而去核能，也能理解对于绿色家园的向往因而建设绿能，也能理解因为天不降水导致大旱进而影响水利供电。二来缺电的问题如果执政党足够重视还是有解决办法的，虽然因为核电厂的燃料棒已经全部送往美国，已经不可能重启核电了。但还能加大绿能投入 ，重新配比绿能、天然气以及燃煤，而不是荒唐的天然气百分之五十，绿能百分之二十，燃煤百分之三十。或者建设天然气接收站也行，虽然会遭到环保人士的反对，但总是有办法的。所以缺电并不可怕，可怕的是缺点暴露出来的安全危机。</p>
+<p>但是如果真如民进党所说是因为一颗按钮按错导致百万人限电，台电赔偿五亿。那问题就会上升到国安层面，也许解放军一次网络攻击、一颗炮弹也能让台湾全岛陷入黑暗，陷入漫长无尽头的恐慌。相信这并不是民进党当局希望看到的，但很可能超出了他们的能力范围。有没有能力是一回事，重不重视、务不务实、努不努力是更重要的另一回事。</p>
+<p>到底因何停电？真相却是可以由执政者任意涂抹，在野党和百姓没有多少讨价还价之余地。但是真正的真相并不会随着时间消失，它就在那里。真相的重要性并不在于真相的本身，而在于理清真相之后，面对真相之后，如何预测其带来的利与弊，面对利弊如何趋利避害、防微杜渐。<br>
+长期的可持续的利益是不如短期的利益更诱惑的，而小团体的短期的利益经常凌驾于大众的长期利益至上。面对缺电，执政党到底是自信自己的能力还是高估了天意？还是误判民众和对手都智力？大概他们在乎的只有选举利益吧。都说台湾是诈骗天堂，我觉得也是政治骗子的最佳表演舞台，安排好话术，政治人物可以没有原则没有底线，可以让人们对于政治人物的话也可以不加思考地接受。但是现实中的年轻人已经不再是单一颜色就能全盘接收的了，他们开始有了自己崭新的贴近现实的思考。对于执政者来说，对于拥有选举制度的台湾来说，水能载舟亦能覆舟不会是一句空话。</p>
+<p>一个执政党还有长期的目标，最好将广大的群众利益置于正当利益至上。这样才能最好的发挥民主议政的力量。缺水，缺电都不要紧，要采取有用的措施来避免。实际上这也是我一厢情愿的说法，对于当下的台湾政党而言，简直不可想象。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[真相只有一个]]></title>
+        <id>https://blog.hacking.icu/zhen-xiang-zhi-you-yi-ge</id>
+        <link href="https://blog.hacking.icu/zhen-xiang-zhi-you-yi-ge"/>
+        <updated>2021-05-13T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[成都中学一学生坠楼身亡，其母亲以及很多网友质疑案情扑朔，而官方一口咬定真相就是自杀。那么真相是什么？距离真相有多远？
+真相只有一个，但是我不知道相信谁？孩子的母亲吗？确实提出了疑点，却没给出证据，事实上要求家属给出被害人被害的证据，也是不现...]]></summary>
+        <content type="html"><![CDATA[<p>成都中学一学生坠楼身亡，其母亲以及很多网友质疑案情扑朔，而官方一口咬定真相就是自杀。那么真相是什么？距离真相有多远？</p>
+<p>真相只有一个，但是我不知道相信谁？孩子的母亲吗？确实提出了疑点，却没给出证据，事实上要求家属给出被害人被害的证据，也是不现实的。那么是否真如警方所说，他是自杀的呢？蓝底白字的半夜发布的通告也没有给出支持这一结论的证据。作为公民，自然有人同情死者家属，为年轻的生命的逝去而感到难以接受，希望能够找出合理的解释。作为旁观者，自然也有人质疑家属充满情绪、无法接受现实。大家都试图去左右舆论，真相反倒并不那么重要。</p>
+<p>为了影响舆论的走势，真相必定为我所用。为了支持自己的观点，都在有意无意暗示或明示自己掌握的是真相。真相成为了一种工具甚至是兵器，可以用了杀害不同立场的人们。真相也如同是人尽可夫的妓，谁都可以在她身上涂脂抹粉，打扮成自己想要的模样。假作真时真亦假，谁都可以说道一二，真理仿佛每一个人都洞明。</p>
+<p>对于政府而言，要想平息舆论，最好的做法不是粉饰太平，而是查清真相。真相就是，不论贫贱富贵、王公贵胄，法律面前人人平等。真相就是有一说一，有二说二，而不是说三道四，顾左右而言他。真相就是只有一个，将调查的过程，结论的依据公之于众，供所有人检视。</p>
+<p>对于家属而言，要想得到真相，首先要放下自己心中的真相。明确自己要的只是真相以告慰往生者，也安抚自己，而不是其他。质疑难面，但是不能自大，监督政府的调查，而不是左右政府的立场与想法。年轻的子女适合凤款式、颜色。</p>
+<p>常言道人言可畏，舆论左右舆论，谁都想要一席之地，收获正义替天行道。所以网络是自由之地，极大的支持舆论的广泛地传播，为广开言路、监督公权，提供了支持，所以网络也能部分体现民意。在这件事情中，网络的舆论对政府造成了极大的压力。政府极力应付却顾此失彼，维护稳定却造就了更多的隐患。维稳思想根深蒂固，现代化治理能力却更不上时代发展。陷入了能力越低，公信力越差、公信力越差，维稳难度越高的恶心循环。政府的眼里没有真相，没有真相，也不会有和解，更换不来太平安定。</p>
+<p>同时网络也是无依之地，集众人之一词，行诛心之举。为了流量、为了利益、为了一时口快，可以不顾道义、不论情理、不求同理的包围攻讦异己。网络成了各方势力割据的博弈场。所以，网络的舆论并不代表真相，其背后有众多无形的手打太极。网络的舆论也并不公平，天平总是倾向于那些网络治理的人和那些能在网络上呼风唤雨的人，也许那些也不是人。真相在网络中也越发扑朔迷离，时而众口铄金，时而各执一词。</p>
+<p>所以，类似于成都这样的舆论热点，很快会冷却在舆论场中。很多人在成都哪所中学前高喊真相，一度和警方发生冲突。这种不过是历史的注脚，没有人知道在历史的演进中，真相会出现在哪里，会出现在何时？</p>
+<blockquote>
+<p>早上政府部门公布了监控视频等更为详细的信息，可以证明孩子为自杀。但是现在公布已经晚了，也比不公布要好。</p>
+</blockquote>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[使用 Bean 优雅的传递参数]]></title>
+        <id>https://blog.hacking.icu/using-beans-in-php</id>
+        <link href="https://blog.hacking.icu/using-beans-in-php"/>
+        <updated>2021-04-25T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[在我们的代码中，无外乎是数据和逻辑。但是很多代码很不好的地方就在于数据和逻辑结合地太过于紧密，这样就会导致代码的可维护性和可扩展性大大降低。所以，我们需要将数据封装起来，从逻辑中抽取出来。要做到这一点，有非常多的手段，其中一种就是使用 Be...]]></summary>
+        <content type="html"><![CDATA[<p>在我们的代码中，无外乎是数据和逻辑。但是很多代码很不好的地方就在于数据和逻辑结合地太过于紧密，这样就会导致代码的可维护性和可扩展性大大降低。所以，我们需要将数据封装起来，从逻辑中抽取出来。要做到这一点，有非常多的手段，其中一种就是使用 Bean 的类来抽离数据。</p>
+<h3 id="如何使用-bean-来传参">如何使用 Bean 来传参</h3>
+<p>我们经常会看到如下的代码，一个方法会接受很多的参数:</p>
+<pre><code class="language-php">class Service {
+        public function doSomeTime(string $boo, int $foo, string $bzz, bool $baz, float $faz) {} 
+}
+</code></pre>
+<p>甚至有时候参数多得要换行写。为了解决这个方法，很多人会使用聚合类的数据结构来包装这些变量，如改成如下形式:</p>
+<pre><code class="language-php">class Service {
+    /**
+     * @example doSomeTime(['boo' =&gt; '', 'foo' =&gt; '', 'bzz' =&gt; '', baz =&gt; '', 'faz' =&gt; ''])
+     */
+        public static function doSomeThings(array $params) {} 
+}
+</code></pre>
+<p>我们使用 <code>$param</code> 来接受传参一来是少了类型的校验、二来是代码缺少了 self-document ，需要额外的注释来说明。所以，如果我们可以使用使用一种名为 Bean 的类来封装代码如下:</p>
+<pre><code class="language-php">class ParamsBean {
+    protected string $boo;
+  protected int $foo;
+  protected string $bzz;
+  protected bool $baz;
+  protected float $faz;
+}
+</code></pre>
+<p>可以看出，我们的 Bean 类就是普通的类，只是这中类没有啥逻辑，是纯粹对数据的封装。一般我们还会给这些类中的属性写一些 <code>getter</code> 、 <code>setter</code>  的方法。如下示例:</p>
+<pre><code class="language-php">class ParamsBean {
+    protected string $boo;
+  // getter
+  public function getBoo(): string {
+    return $this-&gt;$boo; 
+  }
+  // setter
+  public function setBoo(string $boo): void {
+    $this-&gt;$boo = $boo;
+  }
+}
+</code></pre>
+<p>其实就是这么简单，但是我们代码可以更加优雅。比如上面的例子:</p>
+<pre><code class="language-php">$bean = new ParamsBean();
+$bean-&gt;setBoo('boo');
+Service::doSomeThings($bean);
+</code></pre>
+<p>这样我们就解决了上面所说的两个问题，首先是类型不能校验的问题，现在我们交给了 Bean  中的属性类型校验，并且通过 <code>getter</code> 和 <code>setter</code> 方法，我们对类型可以加强校验或对参数进一步加工。另外我们的代码本身就是 self-document 的，这也是面向对象编程带给我们的，代码的可读性会更好，封装性更好。如下图所示:</p>
+<p><img src="https://static.gridea.dev/294376244890305033/rZp1MUFyA.png" alt="" loading="lazy"></p>
+<p>对于这个 Bean 中拥有那些属性，在 IDE 的帮助下一目了然。</p>
+<h3 id="对-bean-进行封装">对 Bean 进行封装</h3>
+<p>但是上面这样的 Bean 还不是很好用，比如我希望对 Bean 做更多的通用性地封装。下面的代码参考了 EasySwoole 框架中 Bean 的实现。比如我们可以传入一个数组，然后根据传入的数组为 Bean 中的属性进行赋值:</p>
+<pre><code class="language-php">class Bean {
+        public function __construct (?array $data) {
+        foreach ($data as $key =&gt; $value) {
+            $this-&gt;$key = $value;
+        }
+    } 
+}
+</code></pre>
+<p>再来，我们可以希望能够将 Bean 中的数据输出为数组, 为其添加 toArray 方法:</p>
+<pre><code class="language-php">class Bean {
+        public function toArray (): array {
+        $data = [];
+        foreach ($this as $key =&gt; $value) {
+            $data[$key] = $value;
+        }
+        return $data;
+    } 
+}
+</code></pre>
+<p>接着，我们希望当用户传入 Bean 中不存在的属性的时候能够自动的过滤掉。不然当执行到构造方法第 5 行的时候，会因为属性不存在而报错 $this-&gt;$key , 可是 $key 在 Bean 中可能会不存在。</p>
+<p>要实现这点，首先我们要利用反射获取所有的 Bean 中的属性。然后在判断是否 $key 是否在属性中存在:</p>
+<pre><code class="language-php">final public function allProperty (): array {
+        $data = [];
+        $clazz = new ReflectionClass($this);
+            // 利用反射获取类中所有 Public 和 Protected 修饰的属性
+        $protectedAndPublicProps = $clazz-&gt;getProperties(
+            ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED
+        );
+        foreach ($protectedAndPublicProps as $prop) {
+            if ($prop-&gt;isStatic()) {        
+                continue;       // 跳过静态属性，一般也不建议在 Bean 中写静态的属性，除非是个别的常量
+            }
+            array_push($data, $prop-&gt;getName());
+        }
+        return $data;
+    }
+</code></pre>
+<p>最后，我们来实现一个过滤方法，在构造函数以及 <code>toArray</code> 方法都去过滤不存在的属性:</p>
+<pre><code class="language-php">private function filterNotExistsProps (array $data): array {
+        $props = $this-&gt;allProperty();
+    // 获取所有的属性，并过滤数据
+        return array_filter($data, fn($key) =&gt; in_array($key, $props), ARRAY_FILTER_USE_KEY);
+}
+</code></pre>
+<p>到这里，我们的 Bean 就比较好用了。但是相对 EasySwoole 中的实现还是简单了一些，也算是抛砖引玉吧。大家可以去看看这个框架中的实现，或者其他的框架也会有类似的实现。</p>
+<h3 id="对-bean-的单元测试">对 Bean 的单元测试</h3>
+<p>最后，我们要给之前写的这个 Bean 类写一段单元测试，代码抄录如下:</p>
+<pre><code class="language-php">class BeanTest extends TestCase {
+    protected Bean $bean;
+    protected function setUp () {
+        parent::setUp();
+        // 利用匿名函数构造一个被测试的类，继承我们上面写的 Bean 类
+        $this-&gt;bean = new class(['name' =&gt; 'bob', 'age' =&gt; 15, 'notExistsKey' =&gt; false]) extends Bean {
+            protected string $name;
+            protected int $age;
+            protected static string $staticProp = 'static prop';
+            public function getName () { return $this-&gt;name; }
+        };
+    }
+    /**
+     * 测试构造函数
+     */
+    public function testConstruct () {
+        $this-&gt;assertEquals('bob', $this-&gt;bean-&gt;getName());
+    }
+    /**
+     * 测试输出数组
+     */
+    public function testToArray () {
+        $arr = $this-&gt;bean-&gt;toArray();
+        $this-&gt;assertIsArray($arr);
+        $this-&gt;assertArrayHasKey('name', $arr);
+        $this-&gt;assertArrayHasKey('age', $arr);
+        $this-&gt;assertArrayNotHasKey('notExistsKey', $arr);
+        $this-&gt;assertEquals('bob', $arr['name']);
+        $this-&gt;assertEquals(15, $arr['age']);
+    }
+}
+</code></pre>
+<h3 id="总结">总结</h3>
+<p>这篇文章一来是和大家分享，如何更加优雅地封装我们在代码中的数据。我很喜欢一个比喻，逻辑就是水管，而数据就是水管里的水。我们要引导水流，控制它的流向以及水量。</p>
+<p>另外，还是想和大家分享这个原则，数据和逻辑分离。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[PHP 框架编写基础]]></title>
+        <id>https://blog.hacking.icu/php-framework-basic</id>
+        <link href="https://blog.hacking.icu/php-framework-basic"/>
+        <updated>2021-04-23T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[我刚开始学会使用框架的时候，我就很好奇框架是如何写出来的。我就问一个技术大牛，如何写一个框架。他只对我说了一句话：你去写。嗯嗯，是的，尝试去做永远是最正确的事情。在开始编写一个框架之前，我们也需要了解一些基础知识，虽然这些内容在平时使用框架...]]></summary>
+        <content type="html"><![CDATA[<p>我刚开始学会使用框架的时候，我就很好奇框架是如何写出来的。我就问一个技术大牛，如何写一个框架。他只对我说了一句话：你去写。嗯嗯，是的，尝试去做永远是最正确的事情。在开始编写一个框架之前，我们也需要了解一些基础知识，虽然这些内容在平时使用框架的时候可能并不需要在意，确是一个框架的基础。</p>
+<h3 id="文件引入require-and-include">文件引入（Require And Include）</h3>
+<p>计算机领域中最核心的思想概念就是分而治之，分层分模块。换句话说就是将代码划分到不同的文件中，你难以想象一个代码文件中有成千上万行代码，如何阅读？如何维护？所以，真实的项目中，我们会将代码划分在不同的文件中，每个文件中不同的存放相同的代码。</p>
+<p>那么在 PHP 中，如何引入其他文件中的代码呢？有两组四个语句: require 和 require_once ， include 和 include_once 。它们之间有什么区别呢？</p>
+<p>• require 和 include 的区别在于主要在于对待错误的不同态度：<br>
+• require 如果引入的文件中存在错误，则会停止执行剩下的程序<br>
+• include 如果引入的文件中存在错误，则会继续执行剩下的程序<br>
+• 所以，优先使用 require<br>
+• require_once 和 include_once 中的 once 指的是相同的文件只会引入一次，而不会重复引入，优先使用 require_once ,而不是使用 require 。</p>
+<p>示例代码如下:</p>
+<pre><code>&lt;?php
+require_once &quot;/path/filename&quot;;
+</code></pre>
+<blockquote>
+<p>本质上，引入文件就是执行文件中的所有代码。</p>
+</blockquote>
+<h3 id="命名空间namespace">命名空间（Namespace）</h3>
+<p>很多语言中都存在命名空间的概念，作用是类似的，就是为了防止程序中的实体（变量、函数、类）重名。你可能会奇怪，代码都是我们自己写的，怎么会重名呢？换一个名字不就好了吗？不是的，真实的项目中都是团队协作，而且我们还引入了大量的第三方代码库，难以保证不重名。</p>
+<p>我们来看下面的代码，这个是一个错误的示例:</p>
+<pre><code class="language-php">&lt;?php
+class Person {}
+class Person {}     
+// 执行代码会给出 “Fatal error: Cannot declare class Person, because the name is already in use in /Volumes/project/demo/mantu-/project/test.php on line 4” 的错误，意思就是重复定义了同名的类
+</code></pre>
+<p>这就说明类是不能够重复定义的，但是我们可以给 类加上前缀 ，比如在一个年级段中如果有人重名，我们就会说某某班级某某人，当中某某班级就是前缀，用作区分不同的人。比如说我的老家所在的村子叫做新坊村，在全国一共有九个同名的存在。所以当我们在国内说起这个地名的时候，就需要加上前缀，比如说，温州市永嘉县枫林镇新坊村，或者福建上杭县旧县乡新坊村。这样的例子在生活中比比皆是。</p>
+<p>不同的语言对命名空间的实现是不一样的，比如在 Java 中是以目录层级为命名空间的，但是 在 PHP 中，命名空间从语法层面上来说是和目录层级无关的 。</p>
+<p>我们来处理上面这个错误的例子：</p>
+<pre><code class="language-php">&lt;?php
+namespace HangZhou;
+class Person {}
+echo Person::class . PHP_EOL;   // 输出: HangZhou\Person
+namespace ShangHai;
+class Person {}
+echo Person::class . PHP_EOL;   // 输出: ShangHai\Person
+</code></pre>
+<p>从上面的例子中可以看到，我们使用 echo 输出的类名。完整的类名实际上是“命名空间+类名”，这样不同的人、不同的团队、不同的项目都会使用命名空间来区分名称。这样我们就不会重名了。</p>
+<p>在 PHP 中，提供了 use 来简化命名空间的编写：</p>
+<pre><code class="language-php">&lt;?php
+namespace HangZhou\Person;
+class Bob{}
+class Tom{}
+class John{}
+namespace Workspace;
+use HangZhou\Person\Bob;
+$bob = new Bob;
+</code></pre>
+<p>如果我们要引入多个相同命令空间的类呢？可以有两种写法，第一种如下：</p>
+<pre><code class="language-php">&lt;?php
+namespace Workspace;
+use HangZhou\Person\Bob;
+use HangZhou\Person\Tom;
+use HangZhou\Person\John;
+</code></pre>
+<p>上面的写法也可以简化成为一行代码，如下:</p>
+<pre><code class="language-php">&lt;?php
+namespace Workspace;
+use HangZhou\Person\{Bob, Tom, John};       // 很明显，这种写法更加的简洁
+</code></pre>
+<p>如果引入不同的命名空间的相同名称的类，也会发生重名，这时候我们可以采用 as 关键字给引入的类名设定别名（Alias）：</p>
+<pre><code class="language-php">&lt;?php
+namespace ShangHai;
+class Tom {}
+namespace HangZhou;
+class Tom{}
+namespace Workspace;
+use ShangHai\Tom as ShangHaiTom;
+use HangZhou\Tom as HangZhouTom;
+</code></pre>
+<p>所有的实体，都有命名空间。如果没有特殊声明，那么命名空间就是 \ ，所有声明了命名空间的实体，也是以 \ 开始的，只是这个根命名空间可以省略。比如上面例子中的 ShangHai\Tom 实际上完整的写法是 \ShangHai\Tom ，这个和 Linux 下的目录是类似的，都是从根（root）开始的。</p>
+<h3 id="类的自动加载class-autoload">类的自动加载（Class Autoload)</h3>
+<p>前面我们已经铺垫了文件引入以及命名空间的概念，在这个基础上，我们还需要引入一个新的概念，叫做类的自动加载。我们来思考一个问题，在真实的项目中，可能会有成百上千的代码文件，这些代码文件难道都需要用如下的方式手动引入吗？</p>
+<pre><code class="language-php">&lt;?php
+require_once '/path/file1.php';
+require_once '/path/file2.php';
+require_once '/path/filen.php';
+</code></pre>
+<p>估计你这个代码要写到手残，所以我们肯定有更高级的做法，我们可以向 PHP 注册一个函数，当类没有找到的时候，PHP 会主动执行这个函数去自动引入这个类所在的代码文件。如下示例:</p>
+<pre><code class="language-php">&lt;?php
+// 注册一个匿名函数，然后在这个函数中引入文件
+spl_autoload_register(function () {
+    require_once 'file1.php';
+    require_once 'file2.php';
+    require_once 'filen.php';
+});
+// 假设这个类写在 file1.php 中，PHP 根本不知道 Bob 在那个文件里，但是我们事先注册了匿名函数，所以 PHP 会先去执行那个匿名函数，引入了我们的`file1.php`，所以 PHP 也知道了 Bob 这个类所在的文件
+$bob = new Bob();       
+$bob = new John();       // 假设这个类写在 file2.php 中，和 file1.php 同理
+</code></pre>
+<p>你看了这个代码，估计会觉得奇怪，使用 spl_autoload_register 注册一个函数，在注册的函数中我们仍旧要一行行的导入文件啊。对的，但是仔细观察，其实命名空间路径很像，只是文件路径使用 / ，而命名空间使用 \ 。所以，如果我们的命名空间和文件路径保持一致，是不是就可以根据命名空间来找到文件所在的路径了？是的，我们来写写看:</p>
+<pre><code class="language-php">&lt;?php
+spl_autoload_register(function ($class) {
+    // 把命名空间中的`\`替换成`/`，然后拼接上文件后缀`.php`就成了文件的路径了。
+    require_once str_replace('\\', '/', $class) . '.php';
+});
+</code></pre>
+<p>只要所有的类都按照这个规范来编写，我们就可以事先类的自动加载了。比如:</p>
+<pre><code>&lt;?php
+use App\Controller\Users\Bob;  // 这个类在`App/Controller/Users/Bob.php`文件中
+use App\Service\Coupon;             // 这个类在`App/Service/Coupon.php` 文件中
+</code></pre>
+<h3 id="异常和错误处理exception-and-error">异常和错误处理（Exception And Error）</h3>
+<p>在 PHP 中，大部分的都是异常，可以使用 try...catch... 进行捕获，但有些是错误，比如说语法错误、除数为 0 等。我们需要对程序中的异常和错误进行处理，处理的方法和类的自动加载非常相似:</p>
+<pre><code class="language-php">&lt;?php
+set_exception_handler(function (Exception $exception) {
+    // 发送了错误进行处理
+    header('Content-Type:application/json');
+    // 将异常转换为 json 返回给调用方
+    echo json_encode([
+        'message' =&gt; $exception-&gt;getMessage(),
+        'code' =&gt; $exception-&gt;getCode(),
+    ]);
+    die();      // 终止程序执行
+});
+</code></pre>
+<p>错误处理也是一样的，只是使用 set_error_handler 函数进行注册。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Linux 下一条命令是如何执行的]]></title>
+        <id>https://blog.hacking.icu/commands-in-linux</id>
+        <link href="https://blog.hacking.icu/commands-in-linux"/>
+        <updated>2021-04-20T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[在开始学习很多很多的命令之前，我们先来说说一条命令是如何执行的。只有知道了“命令”的本质，我们才能更快更深入的去学习更多的内容。
+命令的本质
+我们以date命令为例，这条命令可以打印系统时间:
+$ date
+2021年 4月20日 星期二 ...]]></summary>
+        <content type="html"><![CDATA[<p>在开始学习很多很多的命令之前，我们先来说说一条命令是如何执行的。只有知道了“命令”的本质，我们才能更快更深入的去学习更多的内容。</p>
+<h3 id="命令的本质">命令的本质</h3>
+<p>我们以<code>date</code>命令为例，这条命令可以打印系统时间:</p>
+<pre><code class="language-shell">$ date
+2021年 4月20日 星期二 15时29分46秒 CST
+</code></pre>
+<p>然后我们再介绍一条有用的命令，<code>which</code> ,这条命令可以找到<code>date</code>命令背后的程序所在的位置:</p>
+<pre><code class="language-shell">$ which date
+/bin/date
+</code></pre>
+<p>最后，再来介绍一个命令，<code>file</code>, 我们可以使用这条命令来返回一个文件的类型:</p>
+<pre><code class="language-shell">$ file /bin/date
+/bin/date: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=c2b6122cb2c8789f66de3342471f9d36b3f722ad, stripped, too many notes (256)
+</code></pre>
+<p>哦，原来<strong>命令的本质就是一个别人写好了软件啊，换句话说就是一个可执行文件</strong>啊。何以见得呢？你看输出信息中有 ELF 64-bit 字样，这是什么意思？可执行文件嘛。</p>
+<h3 id="命令在哪里">命令在哪里</h3>
+<p>在上文中，我们已经知道了，<code>date</code>命令在<code>/bin/</code>目录下。那么其他的命令呢？</p>
+<pre><code class="language-shell">$ which cd
+/usr/bin/cd
+</code></pre>
+<p>嗯嗯，和<code>date</code>命令是存放在不同的目录下的，唯一的相同点是都在一个名为<code>bin</code>的子目录下，bin 是  binary 的缩写。不管是在 Linux 下或者 Windows 下都习惯把可执行文件存放在<code>bin</code>目录下，表示它是二进制的可执行文件。</p>
+<p>问题来了，既然这些命令都存放在不同的目录下，当我们在命令行中输入一条命令的时候，Linux 怎么知道它是在哪一个目录下呢？换一种问法：Linux 是如何找到我们在命令行中输入的命令对应的可执行文件的？</p>
+<p>基于约定，Linux(其实是一个名为 Bash  的软件是用来解释命令的) 和我们约定在环境变量<code>path</code>中定义的目录中存放可执行文件。或者说，当我们在命令行下输入一条命令的时候，它会去<code>path</code>变量中定义的目录中去一个一个的找，找到了就执行，找不到就提示<code>Command not found!</code>:</p>
+<pre><code class="language-shell">$ echo $PATH
+/root/.config/composer/vendor/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin
+</code></pre>
+<p>也就是说在 Linux 下，你只要把你的可执行文件存放在上面使用冒号分隔的任意一个目录中，都能在命令行中输入命令的时候找到对应的程序并执行。那么<code>path</code>这个变量可以改吗？可以加入我自己的目录吗？可以：</p>
+<pre><code class="language-shell"># 把这句话在命令行中执行就生效，或者追加到`~/.bashrc`配置文件中，然后使用`source ~/.bashrc` 生效
+export PATH=&quot;$HOME/my_dir:$PATH&quot;
+</code></pre>
+<blockquote>
+<p>注意: 不要随意更改这个变量，改错了，任何命令都执行不了。Linux 不会对你的危险操作做出提示，因为他的哲学就是，相信你知道自己在做什么。</p>
+</blockquote>
+<h3 id="创建我们自己的命令">创建我们自己的命令</h3>
+<p>然后我们来创建一个自己的命令，你可以使用任何你熟悉的语言来编写。这里，我们使用 C 语言来编写一个经典的 Hello World 程序来演示。之所以使用 C 语言来编写是因为在 Linux 中大量的应用程序都是使用 C 来编写的，我们经常需要来编译安装这些软件，但往往不知所以然。所以使用 C 来编写，是想让大家理解原理。</p>
+<p>创建一个名为<code>hello.c</code>的代码文件，代码如下:</p>
+<pre><code class="language-c">#include &lt;stdio.h&gt;
+
+int main() {
+	printf(&quot;Hello World\n&quot;);
+	return 0;
+}
+</code></pre>
+<p>然后我们来编写一个名为<code>Markfile</code>的文件，使用这个文件来告诉 gcc 编译器如何编译我们的代码，内容如下:</p>
+<pre><code class="language-makefile">hello:hello.c
+	gcc hello.c -o hello
+install:
+	mv hello /usr/bin/hello
+</code></pre>
+<p>解释一下文件内容：编译一个名为<code>hello</code>的可执行程序，其源代码文件是<code>hello.c</code>，使用的编译命令是<code>gcc hello.c -o hello</code>, 当我运行<code>make install</code>的时候，执行<code>mv hello /usr/bin/hello</code>命令。</p>
+<p>所以，接下来，我们就可以来执行编译安装命令了：</p>
+<pre><code class="language-shell">make &amp;&amp; make install
+</code></pre>
+<p>之后我们就可以在任意一个路径中，执行我们的<code>hello</code>命令了，然后会在终端输出<code>Hello World</code>并换行 ：</p>
+<pre><code class="language-shell">$ hello
+Hello World
+</code></pre>
+<blockquote>
+<p>扩展开去说一句，为什么 C 语言那么强大，在 Linux 中我们会使用 Shell 来编写各种脚本而不是使用 C 语言呢？那是因为杀鸡不需宰牛刀。</p>
+</blockquote>
+<p>相信通过这一小节，你应该更加深入的明白了 Linux 下命令的本质了。当你在工作学习中遇到<code>make &amp;&amp; make install</code>这样的命令的时候，或者执行这样的命令出错的时候，就不会感到惊讶，而且容易排错了。</p>
+<h3 id="为什么-windows-和-linux-的软件不能通用">为什么 Windows 和 Linux 的软件不能通用</h3>
+<p>其实不只是 Windows 和 Linux， Linux 和 Android，甚至是 MacOS 和 ipadOS 目前都不能通用(当然 Apple 有计划来实现这件事情，对广大的开发者真是福音)。</p>
+<p>ELF 是英文 Executable and Linkable Format 的简称，换句话说它是 Linux 下可执行文件的格式。对的，可执行文件也是一种文件，既然是文件就会有它的编码格式。为什么 Linux 下的软件不能在 Windows 下运行？就是因为 Windows 的可执行文件使用的是 PE 格式，格式不同也就看着眼熟但不认识。</p>
+<p>你可能会说，格式不同，那容易，格式转换一下就好，一个软件就不需要在 Linux 下写一套、Windows 下写一套了。我们从 ELF 中找到答案，Executable and Linkable Format, 前面解释了 Executable，后面还有一个  Linkable 是什么意思。一个软件的编写，不是从 0 开始写的，会依赖大量的操作系统提供的框架、库。如果你用汇编写代码，那么不使用 Windows 或者 Linux 都可以，直接使用汇编器编译成二进制的 CPU 指令，交给 CPU 执行就好了。但是 Linux 和 Windows 中的程序使用 C 或者 C# 之类的语言编写，大量依赖其他操作系统提供的能力。所以，类似于 Wine 这样的项目，期望在 Linux 上运行 Windows 程序，其工程难度之大让人望而生畏啊，到目前为止也并没有很大的突破。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[Python 面向对象编程]]></title>
+        <id>https://blog.hacking.icu/oop-in-python</id>
+        <link href="https://blog.hacking.icu/oop-in-python"/>
+        <updated>2021-04-20T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[学习面向对象，如果一开始就从理论说起，可能会非常难以理解。所以，我尝试从语法层面说起，这样可能更好理解一些。
+什么是类
+在说面向对象之前，需要先从类( Class ) 说起，因为是先有类，再有对象的。我们可以创建一个类:
+class Per...]]></summary>
+        <content type="html"><![CDATA[<p>学习面向对象，如果一开始就从理论说起，可能会非常难以理解。所以，我尝试从语法层面说起，这样可能更好理解一些。</p>
+<h3 id="什么是类">什么是类</h3>
+<p>在说面向对象之前，需要先从类( Class ) 说起，因为是先有类，再有对象的。我们可以创建一个类:</p>
+<pre><code class="language-python">class Person:
+    name = 'Bob'
+    age = 14
+    
+    def go():
+        print('go')
+</code></pre>
+<p>比如 <code>name</code> 、 <code>age</code> 都是类的属性，也可以理解成类当中的变量(叫做属性)。类当中还有一个函数(这样的说法不准确，类当中的函数叫做方法) ，叫做 <code>go</code> 。</p>
+<p>通过上面这个例子，我们可以来给类从语法层面下一个定义了:</p>
+<blockquote>
+<p>所谓的类，一种数据类型，包含变量和方法。</p>
+</blockquote>
+<p>说类也是一种数据类型，就像列表一样。我们来看看如何声明一个列表:</p>
+<pre><code class="language-python">pers = ['bob', 'june']
+</code></pre>
+<p>你看，列表是一组数据的集合。那么对象呢?和列表不一样的是，它是变量(属性)和函数(方法)的集合。我们访问列表中的元素:</p>
+<pre><code class="language-python">print(pers[0])  # bob
+</code></pre>
+<p>我们访问对象中的属性：</p>
+<pre><code class="language-python">print(Person.name)
+</code></pre>
+<p>所以，从语法层面而言，不要把类看得很特殊，其实和列表、字典之类的数据类型没什么区别。 <strong>所以，我们说类本质上只是一种数据类型罢了。</strong> 如果是面试，说的好听点: <strong>从数据结构的角度来看，</strong> <strong>类是对数据和行为的封装</strong> 。</p>
+<h3 id="什么是对象">什么是对象</h3>
+<p>对象是从哪里来的？不是来源同桌，也不是来源于婚恋网站哦。在编程中，对象的来源只有一种，通过类生成一个对象（也叫做实例化）。所以，从语法上来说，对象是对类的拷贝。</p>
+<blockquote>
+<p>这实例化的概念，其实和现实世界不一样。因为现实世界中，我们是先有人，然后根据人的共同特征行为抽象出一个人类的概念。而在编程中，是先有类，然后根据类复制出一个具体的人。所以，这一点是和现实世界相反的。</p>
+</blockquote>
+<p>然后实例化的语法如下:</p>
+<pre><code class="language-python">class Person:
+    name = ''
+bob = Person()
+</code></pre>
+<p>单纯是类其实没什么意义，只有将类编程具体的人才是又意义。因为这个世界说到底，人类这个词还是由具体的某个人发明的。</p>
+<h3 id="什么是面向对象编程">什么是面向对象编程</h3>
+<p>从语法层面来说，Python 中的一切元素都是对象。其他的类型也是对象的一种子类型，举个例子，字符串也是一种对象:</p>
+<pre><code class="language-python">message = 'String'
+print(message.upper())  # STRING
+</code></pre>
+<p>从上面这个例子中，我们可以发现字符串也有行为(方法)。所以，什么是面向对象编程？ <strong>从语法层面来说，把编程语言中所有的实体(变量、类型、方法、表达式等)都作为对象， 然后我们使用各种对象进行编程。我们将这种做法称之为面向对象编程</strong> 。</p>
+<h3 id="什么是构造方法">什么是构造方法</h3>
+<p>一个类当中，只有两种东西，属性和方法，没有其他。很明显构造方法也是类的一个方法。而且构造方法也是一个特殊的方法。为什么说 <strong>构造方法是特殊的方法，因为这个方法由特殊的语法作用： 一般用来初始化对象</strong> 。</p>
+<p>当我们通过一个类复制出一个对象的时候(实例化), Python 就会去主动运行这个构造方法。我们自己定义的方法，必须在程序中手动的调用，而构造方法会在实例化的时候，由 Python 语言本身(解释器) 去执行它，而且构造方法的方法名称，必须是 <code>__init__</code> 。这就是它的特殊之处，用代码来演示:</p>
+<pre><code class="language-python">class Person:
+    name=&quot;&quot;
+    def __init__(self, name):
+        print(name)
+        
+    def say():
+        print(&quot;say&quot;)
+Person(&quot;Bob&quot;)
+</code></pre>
+<p>执行这段程序，只会输出 <code>Bob</code> ，但是在程序中，我们并没有手动的去调用 <code>__init__</code> 这个方法，这说明 Python 在 <code>Person('Bob')</code> 实例化的时候，会自动执行 <code>__init__</code> 方法。正如这个构造方法的方法名字(init)一样， <strong>我们通常会利用它会在实例化的时候自动执行这个特性，去初始化这个类的属性</strong> 。</p>
+<p>实际上，我们练习一下现实生活，每个孩子生下(实例化)的时候，就有双手双脚双眼双嘴(属性)。实际上，正是为了模拟现实中的这种情况，所以会有一个构造方法，来做这件事情。</p>
+<p><strong>切记: 编程是用来模拟现实的，在模拟现实的基础上，解决一些现实问题， 所以在学习编程的过程中，要时常地联系现实生活</strong>。</p>
+<h3 id="类变量和实例变量">类变量和实例变量</h3>
+<p>我们首先来定义一个类:</p>
+<pre><code class="language-python">class Duck:
+    # 定义在这个位置的称之为类变量
+    age = 2
+    def __init_(self, name):
+        # 定义在这个位置，称之为实例变量
+        self.name = name
+</code></pre>
+<p>关于类变量和实例变量，Python 语言和其他语言是很不一样的。Python 是根据定义的位置加以区分的，而其他语言可能会有特定的的关键字加以区分。下面以 PHP 为例:</p>
+<pre><code class="language-php">class Duck {
+    static $age = 2;   ## 类变量
+    $name = '';        ## 实例变量
+}
+</code></pre>
+<p>所以，关于类变量和实例变量，不能参照其他语言的经验。</p>
+<p>当我们去打印一个对象的变量的时候，会按照如下顺序去查找:</p>
+<ul>
+<li>先查找实例变量</li>
+<li>如果实例变量没有找到，会查找类变量</li>
+<li>如果类变量没有找到会查找继承的变量</li>
+</ul>
+<p>类或实例中地方法，在大多数时候是为了改变类的数据（也称之为类的状态）。所以，如何在类的方法中访问类变量或者实例变量呢？</p>
+<pre><code class="language-python"> class DuckDuckGo:
+    url = ''
+    def __init__(self, method = 'POST'):
+        # 访问实例变量
+        print(self.method)
+        # 访问类变量
+        print(DuckDuckGo.url)
+        print(self.__class__.url)
+</code></pre>
+<h3 id="实例方法-类方法和静态方法">实例方法、类方法和静态方法</h3>
+<h4 id="实例方法">实例方法</h4>
+<p>什么是实例方法， 就是我们在类方法中，将第一个参数定义为 <code>self</code> (也可以是其他的单词，比如说 <code>this</code> , 但 Python 推荐我们使用 <code>self</code>这个单词)。</p>
+<p>Python 会在我们调用这个方法时候，给个名为 <code>self</code> 的变量赋值，这个值就是当前调用这个方法的对象的实例。</p>
+<p>如果有其他的编程语言的经验，其他语言中会使用 <code>this</code> 这个关键字来表示当前实例，Python 也一样只是需要在方法声明的第一个传参显式地定义为 <code>self</code> 。</p>
+<pre><code class="language-python">class DuckDuckGo:
+    def search(self):
+        pass
+</code></pre>
+<h4 id="类方法">类方法</h4>
+<p>类方法的定义如下, 使用 <code>@classmethod</code> 注解来声明一个方法是类方法:</p>
+<pre><code class="language-python">class DuckDuckGo:
+    url = 'https://www.duckduckgo.com'
+    
+    @classmethod
+    def settings(cls):
+        print(cls.url)
+</code></pre>
+<p>和实例方法要在传参的列表中加入 <code>self</code> 一样，类方法也要在传参列表中添加一个名为 <code>cls</code> 的传参。这个名字也是约定俗成的，虽然也可以使用其他的名字。</p>
+<p>调用类方法如下:</p>
+<pre><code class="language-python">DuckDuckGo.settings()
+</code></pre>
+<h4 id="类方法和实例方法的区别">类方法和实例方法的区别</h4>
+<p>那么类方法和实例方法有什么区别呢？**类方法关联的是类本身，而实例方法关联的是实例本身。**这句话是不是好理解？我举一个例子: 当我们和别人谈论中午吃什么的时候，指的是我自己中午吃什么。而当国家领导人和欧盟主席谈论国际粮草供应的时候，讨论的是人类吃什么，而不是他们两个人中午吃什么。</p>
+<p>怎么什么时候用对象方法，什么时候用实例方法呢？当你想要改变实例变量的时候，用实例方法。当你想要改变类变量的时候，使用类方法。</p>
+<blockquote>
+<p>注意: 在 Python 中，我们可以在实例方法中，改变类变量，也可以使用实例对象来调用类方法。但是并不建议这么做，虽然语法上允许这么做，但是违反了类和对象实例的语义。</p>
+</blockquote>
+<h4 id="静态方法">静态方法</h4>
+<p>静态方法的定义语法如下:</p>
+<pre><code class="language-python">class DuckDuckGo:
+    url = 'https://www.duckduck.com'
+    @staticmethod
+    def ping():
+        print(DuckDuckGo.url)
+</code></pre>
+<p>那么静态方法和类方法以及实例方法的区别？</p>
+<p>最大的不同在于，静态方法并没有向类方法和实例方法一样要传入一个类似于 <code>self</code> 和 <code>cls</code> 这样的传参。另外，静态方法，可以同时通过类或者实例对象取调用。</p>
+<pre><code class="language-python">DuckDuckGo.ping()
+ddk = DuckDuckGo()
+ddk.ping()
+</code></pre>
+<p>类方法和静态方法都是可以使用类变量，但是不能调用对象方法。</p>
+<p>在其他的语言中，静态方法和类方法是一样的。但是在 Python 中，将其区分开来了。**并不建议在实际的编程中使用静态方法，因为它和类以及对象的关联是很弱的。**基本上，静态方法都可以使用类方法代替。</p>
+<h3 id="属性和方法的可见性">属性和方法的可见性</h3>
+<p>在面向对象的设计中，属性和方法是可以设置可见性的（你可以理解成，我不想让别人看到我的心）。在 Python中，可见性分为 Public(公开), Private（私有) 两种。</p>
+<p>区别与其他的语言，并没有类似于 Public 或者 Private 这样的关键字的修饰，而是使用双下划线的方式区分是否为公开或私有的属性方法:</p>
+<pre><code class="language-python">class DuckDuckGo:
+    __url = 'https://www.duckduckgo.com'
+    
+    def __dns():
+        pass
+</code></pre>
+<p>如果你调用私有的 <code>__dns</code> 方法，Python 会给出错误的提示:</p>
+<pre><code class="language-python">&gt;&gt;&gt; DuckDuckGo.__dns()
+Traceback (most recent call last):
+  File &quot;test.py&quot;, line 9, in &lt;module&gt;
+    DuckDuckGo.__dns()
+AttributeError: type object 'DuckDuckGo' has no attribute '__dns'
+</code></pre>
+<p>如果你调用私有的变量，同样也会报错:</p>
+<pre><code class="language-python">&gt;&gt;&gt; print(DuckDuckGo.__url)
+Traceback (most recent call last):
+  File &quot;test.py&quot;, line 9, in &lt;module&gt;
+    print(DuckDuckGo.__url)
+AttributeError: type object 'DuckDuckGo' has no attribute '__url'
+</code></pre>
+<p>我们可以通过打印对象的 <code>__dict__</code> 来查看对象的所有的成员变量:</p>
+<pre><code class="language-python">&gt;&gt;&gt; print(DuckDuckGo.__dict__)
+...省略...'_DuckDuckGo__url': 'https://www.duckduckgo.com', '_DuckDuckGo__dns': &lt;function DuckDuckGo.__dns at 0x7f27771ae0d0&gt;
+</code></pre>
+<p>从上面的输出可以看到，Python 内部处理私有的属性和方法，是将我们的属性和方法重命名为 <code>_类名+变量/方法名</code> , 例如 <code>_DuckDuckGo__url</code> 和 <code>_DuckDuckGo__dns</code> 。</p>
+<p>所以，其实没有什么是不能访问的，私有的也是可以访问的。之所以我们访问的时候报错，是因为 Python 将我们的私有变量重命名了。如果要访问，也是访问重命名之后的变量或方法:</p>
+<pre><code class="language-python">&gt;&gt;&gt; print(DuckDuckGo._DuckDuckGo__url)
+https://www.duckduckgo.com
+</code></pre>
+<p><strong>所以，严格意义上来讲，Python 并没有对成员变量或方法的可见性设置一种可靠的机制来禁止其他实体的对其进行访问。</strong></p>
+<h3 id=""></h3>
+<h3 id="继承">**继承 **</h3>
+<h4 id="什么是继承">什么是继承</h4>
+<p>其实我们在之前地例子中，我们已经使用过继承了。我们自己创建了一个类 <code>Person</code> , 在这个类中有一个特殊地方法，我们叫它为构造方法 <code>__init__</code> 。那么这个名为构造方法地方法是从哪里来地呢？是从继承得到的。那么它是继承谁的呢？继承一个名为 object 的对象的。这个对象是 Python 语言本身提供的对象，所有其他的对象都默认继承这个对象。</p>
+<pre><code class="language-python">class Person(object):
+    pass
+class Person:
+    pass
+</code></pre>
+<p>上面两种写法是一样，默认情况下，我们创建的类就是继承 object 类的。object 类当中声明了一些类似于 _ <em>init</em>_ 这样的方法，这些方法都会在特定的时候，由 Python 语言本身去调用。</p>
+<p><strong>继承这个概念，也是来源于生活的。我一生下来，就继承了我爸爸妈妈的部分基因</strong> <strong>，这也是编程中的继承在语法层面的含义</strong> 。</p>
+<p>我们再来举一个例子:</p>
+<pre><code class="language-python">class Person(object):
+    def say(self):
+        print('say')
+class Father(Person):
+    def teach_kids():
+        print('teach')
+bob = Father()
+bob.say()      # say
+</code></pre>
+<p>这个程序运行之后，输出了 say 。可是我们在 Father 这个类中，并没有声明一个 say 的方法，却可以调用，这是为什么呢？因为 Father 这个类继承了 Person 这个类，而 Person 这个类声明了 say 这个方法，被 Father 类继承。 <strong>所以，我们说继承从语法层面来说，是为了实现类的属性或方法的复用</strong> 。</p>
+<p>然后，这个 Father 类自己还有一个名为 <code>teach_kids</code> 的方法，意思是教育孩子。Father 不光是继承了 Person 类的 say 方法，而且还延申扩展出了教育孩子的行为能力。 <strong>所以，继承还能扩展类的能力，这也是符合现实情况的，我们有句话叫做青出于蓝而胜于蓝，就是这样的道理</strong> 。</p>
+<h4 id="什么是重写">什么是重写</h4>
+<p>上面的例子中，Person 拥有 say 方法，而 Father 自动继承了 Person 的 say 方法。那么如果 Person 有 say 方法， Father 自己也有 say 方法呢？</p>
+<pre><code class="language-python">class Person(object):
+    def say(self):
+        print('Person say')
+class Father(Person):
+    def say(self):
+        print('Father say')
+my_father = Father()
+my_father.say()       # 这里输出是 Person say 还是 Father say 呢？
+</code></pre>
+<p>当然，输出的是 Father say 啦。 <strong>因为如果父类(Person) 和子类(Father) 都有相同一个方法，那么子类中的方法会重写父类中的方法</strong> 。</p>
+<p>这样例子，在现实生活中，也比比皆是。举个例子: 我父亲的足球踢得很好，而我并没有继承我父亲的这个基因，虽然也会踢足球，但是提的不好。所以，没有道理，我一定要和我父亲一样能踢好足球。说到底，我虽然继承了我父亲的一些基因，但是我终究是我自己，以我自己的实际情况为准，而不是父亲的复制品。</p>
+<h4 id="站在巨人super的肩膀上">站在巨人（super）的肩膀上</h4>
+<p>“如果我看得比别人更远，那是因为我站在巨人的肩膀上。”这是牛顿说的。有时候，我们利用继承可以站在巨人的肩膀上，利用巨人的能力使得自己做的更好。我们用代码来说明:</p>
+<pre><code class="language-python">class SuperMan(object):
+    def see(self):
+        print('I see the darkness')
+class My(SuperMan):
+    def see(self):
+        super().see()
+        print('I saw the light')
+my = My()
+my.see()
+</code></pre>
+<p>运行这个程序，输出结果如下:</p>
+<pre><code>I see the darkness
+I saw the light
+</code></pre>
+<p>SuperMan 拥有一个方法，叫做 see，这个方法输出一句话：I see the darkness(我看透了黑暗)。My 继承了 SuperMan 并且重写了这个 see 的方法，在我这个 see 的方法中，我可以使用 <code>super().see()</code> 这样的语法调用我继承的父类，也就是 SuperMan 的方法，并且输出一句话: I saw the light(我看到了光明)。</p>
+<p>这就是我说的，站在巨人的肩膀上，不光看透了黑暗，还看到了光明。</p>
+<h4 id="重写和super的语法意义">重写和super的语法意义</h4>
+<p>首先重写和 supper 的特性都是基于继承的。</p>
+<p>重写的意义在于，如果子类和父类都具有相同的一个方法，那么子类的方法会重写父类，换句话说， <strong>子类调用自己的方法的时候，不会去执行父类中的同名方法</strong> 。</p>
+<p>而 super 呢？它的语法意义在于，它可以让子类自己选择是否继承并使用父类的方法，换句话说， <strong>super 这个关键字使得子类可以使用父类的能力，并且做更多的事情</strong> 。</p>
+<h4 id="多重继承">多重继承</h4>
+<p>在现实的生活中，多重继承是在正常不过的行为。比如我爸妈生了我，我继承了我爸妈各自的部分基因。</p>
+<p>但是，现在大多数实现了面向对象思想的编程语言都放弃实现多重继承的特性，比如 Java、PHP 都不支持多重继承。</p>
+<p>Python 是支持多重继承的，但大多数的人都认为要避免使用多重继承，因为这比较麻烦。举个例子，你同时继承了你妈妈的个性和你爸爸的个性，而你自己有没有衍生出自己的个性，那么你以谁的个性为准？是爸爸的，还是妈妈的？</p>
+<p><strong>所以，在实际的编程中，也无需使用多重继承，至于其语法，不了解也没有关系。</strong></p>
+<h4 id="总结">总结</h4>
+<p>继承是为了代码的复用，而重写是为了复用的同时不影响子类自己的发展，而 super 则是允许子类在自己选择是否保留父类的能力，还能展现自己的个性 。</p>
+<h3 id="魔法方法special-method">魔法方法(Special Method)</h3>
+<p>魔法方法，这个名字有两个词语组成，分别是魔法和方法。</p>
+<blockquote>
+<p>有的人会称之为魔法函数，这是不准确的。因为函数是定义在类之外的，而魔法方法只能是定义在类当中的。在 Python 的官方文档中，写的是 Special Method (其日文是 特殊メソッド)，不是 Special Function, 所以应该翻译成魔法方法，而不是魔法函数。</p>
+</blockquote>
+<p>什么是魔法？魔法就是一些看上去很神奇的操作或事情，换句话说就是普通函数无法实现的能力。在对象中定义的函数称之为方法，而魔法方法一定是定义在对象中的。</p>
+<p>其实魔法方法，还具有一个特性： <strong>不需要我们在代码中主动的调用，而是在某些特定时刻由 Python 解释器调用的方法</strong> 。上面的例子中的 <code>__init__</code> 即使如此。</p>
+<pre><code class="language-python">class Person(Object):
+    def __init__(self, name):
+        self.name = name
+</code></pre>
+<p>然后当我们实例化这个对象的时候，这个 <code>__init__</code> 就会自动执行，为 <code>self.name</code> 赋值。</p>
+<p>然后再举一个魔法方法的例子:</p>
+<pre><code class="language-python">class Person(Object):
+    def __init__(self, name):
+        self.name = name
+    def __repl(self, name):
+        return &quot;My name is &quot; + self.name
+</code></pre>
+<p>当我们打印这个类的实例化对象的时候，就会自动执行 <code>__repl__</code> 魔法方法，并输出 <code>My name is ......</code>:</p>
+<pre><code class="language-python">p = Person('admin')
+print(p)  ## My name is admin
+</code></pre>
+<p>国内是翻译成魔法方法，但是其日文是 <strong>特殊メソッド</strong> , 翻译成中文是 <strong>特殊方法</strong> ，而翻译成魔法方法不是非常好理解。说是特殊方法比较好理解，特殊在哪里呢？</p>
+<ul>
+<li>必须出现在类当中，方法名以双下划线开头，以双下划线结尾</li>
+<li>无需手动调用，由 Python 解释器在特定的时机去调用</li>
+<li>实现特定的功能，比如因为 <code>__init__</code> 在对象被实例化的时候被执行，所以非常适合做一些初始化属性的事情</li>
+</ul>
+<p>Python 中由很多类似的魔法方法，无需一次性记住，但是需要知道其原理以及应用。在其他的弱类型语言，比如 PHP 中，也有类似的实现。这样的实现是为了增加代码的灵活性。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[胡雪岩故居之胡雪岩]]></title>
+        <id>https://blog.hacking.icu/hu-xue-yan-gu-ju-zhi-hu-xue-yan</id>
+        <link href="https://blog.hacking.icu/hu-xue-yan-gu-ju-zhi-hu-xue-yan"/>
+        <updated>2021-04-16T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[我去过多次胡雪岩故居，对于故居确实喜欢，这也源于我对古建筑的喜爱。因此，我对它的了解也不局限于走马观花到此一游，更是深入其历史背景以及古建筑营建修复。
+
+
+胡雪岩故居中的门，打开这扇门，进入了一段尘封的历史。虽然，距今不过百余年，却影响至今...]]></summary>
+        <content type="html"><![CDATA[<p>我去过多次胡雪岩故居，对于故居确实喜欢，这也源于我对古建筑的喜爱。因此，我对它的了解也不局限于走马观花到此一游，更是深入其历史背景以及古建筑营建修复。</p>
+<p><img src="https://files.dev-test.cn/2468838a7cba9f2b41f5f3b7cb744efa.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<blockquote>
+<p>胡雪岩故居中的门，打开这扇门，进入了一段尘封的历史。虽然，距今不过百余年，却影响至今。</p>
+</blockquote>
+<p>也因此，这篇文章是这一系列文章的起始。希望通过这一系列文章，和大家介绍胡雪岩故居，充当一次导游的角色。也能融入自己拍摄的一些照片，经由遗存的古建延伸的一些想法。</p>
+<p>第一次去胡雪岩故居还在我上大学期间，我特意去图书馆借了一本《胡雪岩故居》的书，读完了它之后再去的故居。如今已经五六年过去了，这本书也在前两年再版，我买了新版再次拜读。所以，这一系列的文章中，大部分的资料都是参考这本书中的内容而成。</p>
+<p>其实我更关心胡雪岩之故居，而非胡雪岩其人。但要了解故居，对于主人的历史也要略知一二。</p>
+<p><img src="https://files.dev-test.cn/c795cd623f919772a30130bb59fde0ba.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<blockquote>
+<p>胡雪岩故居中复原的亭台楼榭。</p>
+</blockquote>
+<p>胡雪岩的一生经历的咸丰、道光、同治、光绪四个时期，其人可谓红极一时，却又晚景凄惨。</p>
+<p>胡雪岩自幼聪慧，十三岁进入钱庄谋一生计，三十几岁便富甲一方。之所以成功，和两个贵人的相助是分不开的。那是王英九和左宗棠。</p>
+<p>凭借自己的聪慧以及努力，他从钱庄的伙计到跑街到开办自己的钱庄。在这个过程中，他帮助了王英九，对方捐钱得到了捐盐大使，但没有钱赴京。后来王调职浙江巡抚，雪岩帮其练亲军、筹集军粮弹药。王有龄也将所有的军饷的发放交给了胡雪岩的钱庄。</p>
+<p><img src="https://files.dev-test.cn/c04d8de69ff19c78e74e382840b6a875.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<blockquote>
+<p>胡雪岩故居中的栏柱上的石狮子，也是地位和权势。当年，即使是杭州的二品大元到了他家，都需要在门外下轿。</p>
+</blockquote>
+<p>但是在杭州城被太平军二次攻陷后，王英九自杀。此时，胡雪岩刚到杭州城外带着替王有龄筹措的军粮和弹药。听说了杭州城破，王有龄自杀的事情，于钱塘江上三日绕城不肯离去，后下跪磕头离去。并将所有的粮食变卖换成了钱财，防止发霉败坏。</p>
+<p>后左宗棠调任浙江平叛，胡雪岩将之前变卖粮食得到的钱财全部交给了左宗棠助他平叛乱，并组织雇佣军重创太平军。因此他成了左宗棠的左膀右臂。在随后左收复新疆的过程中，三次筹措军饷一千七百多万两，以解燃眉之急。</p>
+<p>在这个过程中，他的钱号也开遍全国，自己也富甲一方。经营范围也不再只是钱庄，还有当铺、药铺、丝绸、金融等。不仅仅如此，他还乐善好施，捐款数以万计、修路建桥、赈灾济贫、设立义渡、平冤昭雪、回购文物，得到了老百姓的信任。王英九和左宗棠确实是他的贵人，助他平步青云，官居二品赏黄马褂。但是他也是对方的贵人啊。即使最后落难，左宗棠还是两次从南京到上海看他，可见一斑。</p>
+<p><img src="https://files.dev-test.cn/b190905a6aa8265f59379bbdb90fe73d.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<blockquote>
+<p>胡雪岩故居中的房檐，依旧古朴而不失气势。</p>
+</blockquote>
+<p>他建立起了一个商业帝国，但是在最后十年里轰然倒塌。主要原因有几个方面，一方面囤积垄断丝绸，对抗洋人，结果被洋人伙同国内的丝绸商人釜底抽薪，亏损巨大。一方面是随着钱庄资金链断裂，引发大量的百姓、达官显贵兑现，资不抵债一溃千里。还有就是随着左宗棠的去世，朝廷中以李鸿章为首的反对派报复打击。在最后十年，大厦将倾，自己也穷困潦倒，官司缠身，在风雨飘摇中离开了人世，享年六十二岁。当官员去查抄他家的时候，形容是一灯如豆，七尺桐棺。实在是抄无可抄，令人扼腕叹息。</p>
+<p><img src="https://files.dev-test.cn/c795cd623f919772a30130bb59fde3hb.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<blockquote>
+<p>胡雪岩也被称为“江南药王”，创办了胡雪岩庆余堂。其店规为真不二价、戒欺，诚信为本，避免了在价格上恶性竞争。</p>
+</blockquote>
+<p>很多人将他的失败归属于他自己，但我并不以为然。在那百年未有之变革中，清朝本身就已经内忧外患风雨飘摇，胡雪岩个人命运有岂是个人能够决定。也有些人对他的“红顶”如鲠在喉，也着实不必，今夕往昔也不可同日而语。对他的否定，那也是对他的高估和对那个时代的轻视。在这段历史中，我看到了他的勤奋实干、看到了他和王英九和左宗棠的情深意重、看到了他高明的经商之道、看到了他对国对民无不是尽心戮力。对这样的人的否定、看似客观实则是苛责低估了时代背景对个人的左右。</p>
+]]></content>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[成双成对]]></title>
+        <id>https://blog.hacking.icu/cheng-shuang-cheng-dui</id>
+        <link href="https://blog.hacking.icu/cheng-shuang-cheng-dui"/>
+        <updated>2021-04-13T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[走在路上，不能总是低着头，捡不到钱不说，还可能会错过很多“成双成对”的风景，生活也可能会少很多乐趣。是的，有些“低级趣味”还是很重要的，所以这一篇我专门挑了几张有趣的成对的照片来说说。
+
+走在这个村子的巷子中，偶然回头看到这种青春的风景，还...]]></summary>
+        <content type="html"><![CDATA[<p>走在路上，不能总是低着头，捡不到钱不说，还可能会错过很多“成双成对”的风景，生活也可能会少很多乐趣。是的，有些“低级趣味”还是很重要的，所以这一篇我专门挑了几张有趣的成对的照片来说说。</p>
+<p><img src="https://files.dev-test.cn/368cd3672ec82816588c799d7011c69f.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<p>走在这个村子的巷子中，偶然回头看到这种青春的风景，还是“情不自禁”按下了快门，记录下那一刻的色彩，记录下那一刻简单的友情。</p>
+<p>现在的大马路上，已经很少能看到女孩子们手牵着手了。现在所谓的闺蜜，其内涵和以前大概也有了较大的区别。</p>
+<p><img src="https://files.dev-test.cn/2de973262060200724bec64b08f4d205.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<p>我想这大概不是一种巧合吧，也许是它们都有一只“帅哥美女”般的燕子吸引了它们，争相呼应吧。不过这么整齐划一的站姿，如此吻合的口型，也许还说着同样的“话语”，还是让我觉得忍俊不禁呢。</p>
+<p><img src="https://files.dev-test.cn/acbb7875f7c5ce2f4790309c7e3b9444.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<p>这是一个下午，村子里的老人通常都没有特别的事情，或者睡午觉、或者坐在门口闲聊、打瞌睡。我和这两个“姐妹”一样，呆在村子的亭子里休息。突然发现她俩的坐姿竟然十分一致，如果不知道还以为是再表演某一种“舞蹈”。心想，这如果不是几十年的姐妹情谊，不会有这样的默契吧。</p>
+<p><img src="https://files.dev-test.cn/cb4e1526a33d61650afef11c315ad344.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<p>有默契的可能还有这对鸭子，我经过这家人的门口，看到了它俩一致的队形。来不及多想，举起相机，单膝跪地，按下快门，完成了这张照片。走在这种村落中，经常会有一些物外之趣，看着照片也很让我着迷。</p>
+<p><img src="https://files.dev-test.cn/139fc551e9e4d6638965000c230500d4.jpg?imageMogr2/auto-orient/blur/1x0/quality/75%7Cwatermark/1/image/aHR0cHM6Ly9maWxlcy5kZXYtdGVzdC5jbi93YXRlcm1hcmstZXhwb3J0LnBuZw==/dissolve/92/gravity/SouthEast/dx/10/dy/10" alt="" loading="lazy"></p>
+<p>最后，来一张让人脸红的“照片”，拍摄于我回家途中。画面非常的小清新，这两只小虫子正在完成一生中的某种注定的“使命”。我祝愿它们恩恩爱爱，比翼齐飞哈。</p>
+]]></content>
+    </entry>
+</feed>
